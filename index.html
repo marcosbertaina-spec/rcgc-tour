@@ -869,24 +869,44 @@ window.seedPlayers=async()=>{
     ["TAZZIOLI","Luis Jnr",2020,"M"],["TORREZ VELEZ","Ignacio",2018,"M"],
     ["VISSIO","Hilario",2018,"M"]
   ];
-  if(!confirm(`¿Cargar ${D.length} jugadores a Firebase?`))return;
+  if(!confirm(`¿Cargar ${D.length} jugadores a Firebase? Borrá primero el jugador que ya está cargado.`))return;
+
+  // Primero verificar las reglas de Firestore haciendo un test write
+  showToast("Verificando permisos...");
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-  let cargados=0;
-  showToast("Cargando jugadores... 0/"+D.length);
-  for(let i=0;i<D.length;i++){
-    const r=D[i];
+
+  // Importar writeBatch y getDocs dinámicamente
+  const {writeBatch, doc: fbDoc} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+
+  let totalCargados=0;
+  // Cargar en lotes de 20 (límite de writeBatch es 500, usamos 20 para ser conservadores)
+  const LOTE=20;
+  for(let inicio=0; inicio<D.length; inicio+=LOTE){
+    const lote=D.slice(inicio, inicio+LOTE);
+    const batch=writeBatch(db);
+    for(const r of lote){
+      const ref=fbDoc(collection(db,"players"));
+      batch.set(ref,{apellido:r[0],nombre:r[1],anio:r[2],fecha_nac:r[2]+"-01-01",genero:r[3]});
+    }
     try{
-      await addDoc(collection(db,"players"),{apellido:r[0],nombre:r[1],anio:r[2],fecha_nac:r[2]+"-01-01",genero:r[3]});
-      cargados++;
-      // Actualizar toast cada 5 jugadores
-      if(cargados%5===0) showToast("Cargando... "+cargados+"/"+D.length);
-      // Pausa cada 10 jugadores para no saturar Firebase
-      if((i+1)%10===0) await sleep(500);
+      await batch.commit();
+      totalCargados+=lote.length;
+      showToast("Cargando... "+totalCargados+"/"+D.length);
+      await sleep(300);
     }catch(e){
-      console.error("Error en jugador "+r[0]+", "+r[1]+": "+e.message);
+      showToast("Error en lote "+(inicio/LOTE+1)+": "+e.message,"err");
+      console.error(e);
+      // Intentar uno por uno como fallback
+      for(const r of lote){
+        try{
+          await addDoc(collection(db,"players"),{apellido:r[0],nombre:r[1],anio:r[2],fecha_nac:r[2]+"-01-01",genero:r[3]});
+          totalCargados++;
+          await sleep(200);
+        }catch(e2){console.error("Falló: "+r[0]+","+r[1],e2);}
+      }
     }
   }
-  showToast("¡Listo! "+cargados+" jugadores cargados.");
+  showToast("¡Listo! "+totalCargados+" jugadores cargados.");
 };
 
 function showToast(msg,type="ok"){
