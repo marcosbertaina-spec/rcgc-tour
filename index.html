@@ -300,12 +300,12 @@ import { getFirestore, collection, doc, getDocs, addDoc, setDoc, deleteDoc,
 //  (los obtenés en console.firebase.google.com → tu proyecto → Configuración → App web)
 // ══════════════════════════════════════════════════════
 const firebaseConfig = {
-  apiKey:            "PEGAR_apiKey",
-  authDomain:        "PEGAR_authDomain",
-  projectId:         "PEGAR_projectId",
-  storageBucket:     "PEGAR_storageBucket",
-  messagingSenderId: "PEGAR_messagingSenderId",
-  appId:             "PEGAR_appId"
+  apiKey:            "AIzaSyAIc1hUBoh--K0W_QQ7ESZ-C2xLxi8ednA",
+  authDomain:        "rcgc-junior-tour.firebaseapp.com",
+  projectId:         "rcgc-junior-tour",
+  storageBucket:     "rcgc-junior-tour.firebasestorage.app",
+  messagingSenderId: "225375490813",
+  appId:             "1:225375490813:web:5273b5c8b5c574c8736494"
 };
 
 // ⚠️  PASO 2: Cambiá esta contraseña
@@ -870,9 +870,23 @@ window.seedPlayers=async()=>{
     ["VISSIO","Hilario",2018,"M"]
   ];
   if(!confirm(`¿Cargar ${D.length} jugadores a Firebase?`))return;
-  showToast("Cargando...");
-  for(const r of D)await addDoc(collection(db,"players"),{apellido:r[0],nombre:r[1],anio:r[2],fecha_nac:r[2]+"-01-01",genero:r[3]});
-  showToast("¡Jugadores cargados!");
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  let cargados=0;
+  showToast("Cargando jugadores... 0/"+D.length);
+  for(let i=0;i<D.length;i++){
+    const r=D[i];
+    try{
+      await addDoc(collection(db,"players"),{apellido:r[0],nombre:r[1],anio:r[2],fecha_nac:r[2]+"-01-01",genero:r[3]});
+      cargados++;
+      // Actualizar toast cada 5 jugadores
+      if(cargados%5===0) showToast("Cargando... "+cargados+"/"+D.length);
+      // Pausa cada 10 jugadores para no saturar Firebase
+      if((i+1)%10===0) await sleep(500);
+    }catch(e){
+      console.error("Error en jugador "+r[0]+", "+r[1]+": "+e.message);
+    }
+  }
+  showToast("¡Listo! "+cargados+" jugadores cargados.");
 };
 
 function showToast(msg,type="ok"){
