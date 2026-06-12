@@ -199,6 +199,14 @@ table.lb tr:hover td{background:#fafaf8}
   display:flex;align-items:center;justify-content:center;z-index:500}
 .modal-box{background:var(--white);border-radius:16px;padding:28px 24px;
   width:420px;max-width:95vw;box-shadow:var(--sh-lg)}
+.modal-box-wide{width:760px;max-height:85vh;overflow:auto}
+.imp-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.imp-table th,.imp-table td{padding:5px 8px;border-bottom:1px solid var(--bd);text-align:left}
+.imp-ok{color:#1a7a3a}
+.imp-skip{color:var(--tl)}
+.imp-summary{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0}
+.imp-summary div{background:var(--bg2);border-radius:8px;padding:8px 14px;font-size:13px}
+.imp-summary b{font-family:'Playfair Display',serif;font-size:18px;color:var(--gd);display:block}
 .modal-box h3{font-family:'Playfair Display',serif;font-size:20px;color:var(--gd);margin-bottom:20px}
 .modal-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
 
@@ -327,6 +335,7 @@ table.lb tr:hover td{background:#fafaf8}
     <div id="tab-estadisticas" class="tab-content" style="display:none"></div>
     <div id="tab-jugadores"   class="tab-content" style="display:none"></div>
     <div id="tab-backup"      class="tab-content" style="display:none"></div>
+    <div id="tab-sponsors"    class="tab-content" style="display:none"></div>
   </main>
 </div>
 
@@ -362,6 +371,8 @@ const db    = getFirestore(fbApp);
 
 const CAT_LABEL  = {M18:"Menores de 18",ALBATROS:"Albatros",AGUILA:"Aguila",BIRDIE:"Birdie",PAR:"Par",PRINCIPIANTES:"Principiantes",INICIALES:"Iniciales"};
 const CAT_YEARS  = {M18:"2008-2012",ALBATROS:"2013-2014",AGUILA:"2015-2016",BIRDIE:"2017-2018",PAR:"2019-2020",PRINCIPIANTES:"Cualquier edad",INICIALES:"2021+"};
+// Base de alumnos (apellido/nombre/genero/fecha_nac) para importar fechas de nacimiento faltantes
+const ALUMNOS_FECHAS = [{"apellido": "ABELLA", "nombre": "Rosario", "genero": "F", "fecha_nac": "2016-11-04"}, {"apellido": "ALONSO", "nombre": "Rafael", "genero": "M", "fecha_nac": "2015-07-08"}, {"apellido": "ALVAREZ", "nombre": "Charo", "genero": "F", "fecha_nac": "2019-04-17"}, {"apellido": "ALVAREZ", "nombre": "Cruz", "genero": "F", "fecha_nac": "2016-07-19"}, {"apellido": "ALVAREZ", "nombre": "Polo", "genero": "M", "fecha_nac": "2021-01-02"}, {"apellido": "AMILLANO", "nombre": "Rosario", "genero": "F", "fecha_nac": "2016-08-23"}, {"apellido": "APRA", "nombre": "Vicente", "genero": "M", "fecha_nac": "2015-10-28"}, {"apellido": "ARCE", "nombre": "Santos", "genero": "M", "fecha_nac": ""}, {"apellido": "ATTIAS", "nombre": "Julieta", "genero": "F", "fecha_nac": "2020-02-27"}, {"apellido": "AYERBE", "nombre": "Tomas", "genero": "M", "fecha_nac": "2018-04-12"}, {"apellido": "BALDONI BRESSAN", "nombre": "Baltazar", "genero": "F", "fecha_nac": "2020-07-23"}, {"apellido": "BALDONI BRESSAN", "nombre": "Eloy", "genero": "M", "fecha_nac": "2018-03-08"}, {"apellido": "BEAMONTE", "nombre": "Justo", "genero": "M", "fecha_nac": ""}, {"apellido": "BEAMONTE", "nombre": "Matilde", "genero": "F", "fecha_nac": "2017-07-19"}, {"apellido": "BEAMONTE", "nombre": "Ramon", "genero": "M", "fecha_nac": "2019-11-21"}, {"apellido": "BELGOFF", "nombre": "Ines", "genero": "F", "fecha_nac": "2020-07-10"}, {"apellido": "BERTAINA", "nombre": "Clara", "genero": "F", "fecha_nac": "2021-03-02"}, {"apellido": "BERTAINA", "nombre": "Lucia", "genero": "F", "fecha_nac": "2015-05-02"}, {"apellido": "BERTOLDI", "nombre": "Lola", "genero": "F", "fecha_nac": "2020-02-03"}, {"apellido": "BERTOLDI", "nombre": "Tomas", "genero": "M", "fecha_nac": ""}, {"apellido": "BERTOLDI", "nombre": "Vicente", "genero": "M", "fecha_nac": "2021-07-28"}, {"apellido": "BILBAO", "nombre": "Alejo", "genero": "M", "fecha_nac": ""}, {"apellido": "BOCCO", "nombre": "Isabella", "genero": "F", "fecha_nac": "2014-03-31"}, {"apellido": "BUSTAMANTE", "nombre": "Lara", "genero": "F", "fecha_nac": "2015-02-23"}, {"apellido": "BUSTAMANTE", "nombre": "Maria", "genero": "F", "fecha_nac": "2017-07-12"}, {"apellido": "BUSTAMANTE", "nombre": "Paula", "genero": "F", "fecha_nac": "2013-07-02"}, {"apellido": "CACCIAVIGLIANI", "nombre": "Santino", "genero": "M", "fecha_nac": ""}, {"apellido": "CACCIAVILLANI", "nombre": "Isabella", "genero": "F", "fecha_nac": "2012-12-21"}, {"apellido": "CAGNOLATTI", "nombre": "Federica", "genero": "F", "fecha_nac": ""}, {"apellido": "CAGNOLATTI", "nombre": "Lorenzo", "genero": "M", "fecha_nac": ""}, {"apellido": "CARBONETTI", "nombre": "Martina", "genero": "F", "fecha_nac": "2013-01-17"}, {"apellido": "CAROL", "nombre": "Juan Cruz", "genero": "M", "fecha_nac": "2014-11-19"}, {"apellido": "CARRANZA JORBA", "nombre": "Alfonso", "genero": "M", "fecha_nac": "2015-08-12"}, {"apellido": "CARRANZA", "nombre": "Agustin", "genero": "M", "fecha_nac": "2009-12-26"}, {"apellido": "CARRANZA", "nombre": "Clodomiro", "genero": "M", "fecha_nac": "2011-01-19"}, {"apellido": "CARRANZA", "nombre": "Francisco", "genero": "M", "fecha_nac": "2019-08-01"}, {"apellido": "CARRANZA", "nombre": "Guada", "genero": "F", "fecha_nac": "2020-03-05"}, {"apellido": "CARRANZA", "nombre": "Ignacio", "genero": "M", "fecha_nac": "2014-03-21"}, {"apellido": "CARRANZA", "nombre": "Joaquin", "genero": "M", "fecha_nac": "2017-09-15"}, {"apellido": "CARRANZA", "nombre": "Justo", "genero": "M", "fecha_nac": "2012-10-26"}, {"apellido": "CARRANZA", "nombre": "Magui", "genero": "F", "fecha_nac": "2020-03-05"}, {"apellido": "CARRIZO", "nombre": "Trinidad", "genero": "F", "fecha_nac": "2016-06-28"}, {"apellido": "CASSIDY", "nombre": "Lourdes", "genero": "F", "fecha_nac": "2015-06-23"}, {"apellido": "CASSIDY", "nombre": "Martina", "genero": "F", "fecha_nac": "2016-11-10"}, {"apellido": "CASTROPEÑA", "nombre": "Hilario", "genero": "M", "fecha_nac": "2018-11-09"}, {"apellido": "CASTROPEÑA", "nombre": "Lujan", "genero": "F", "fecha_nac": "2020-12-10"}, {"apellido": "CONSTANTINO", "nombre": "Luis", "genero": "M", "fecha_nac": ""}, {"apellido": "CONSTANTINO", "nombre": "Martin", "genero": "M", "fecha_nac": "2019-05-22"}, {"apellido": "DECOUVETTE", "nombre": "Federico", "genero": "M", "fecha_nac": "2013-10-01"}, {"apellido": "DIAZ KAÑERA", "nombre": "Ignacio", "genero": "M", "fecha_nac": "2012-04-16"}, {"apellido": "FALCO ROSS", "nombre": "Ignacio", "genero": "M", "fecha_nac": ""}, {"apellido": "FALCO ROSS", "nombre": "Josefina", "genero": "F", "fecha_nac": ""}, {"apellido": "FONZO", "nombre": "Vicente", "genero": "M", "fecha_nac": "2015-10-28"}, {"apellido": "GAGLIARDO", "nombre": "Maria", "genero": "F", "fecha_nac": "2012-02-12"}, {"apellido": "GAGLIARDO", "nombre": "Pilar", "genero": "F", "fecha_nac": "2015-05-20"}, {"apellido": "GALIZIA", "nombre": "Ramiro", "genero": "M", "fecha_nac": "2019-07-10"}, {"apellido": "GIULIANO", "nombre": "Ana", "genero": "F", "fecha_nac": "2009-08-11"}, {"apellido": "JORBA", "nombre": "Maia", "genero": "F", "fecha_nac": ""}, {"apellido": "LAFALCE", "nombre": "Franca", "genero": "F", "fecha_nac": "2017-02-06"}, {"apellido": "LAVASELLI", "nombre": "Serafin", "genero": "M", "fecha_nac": ""}, {"apellido": "LENARDON", "nombre": "Albertina", "genero": "F", "fecha_nac": "2012-09-20"}, {"apellido": "LENARDON", "nombre": "Angeles", "genero": "F", "fecha_nac": "2021-04-14"}, {"apellido": "LENARDON", "nombre": "Victoria", "genero": "F", "fecha_nac": "2017-11-22"}, {"apellido": "LESCANO", "nombre": "Juan Cruz", "genero": "M", "fecha_nac": ""}, {"apellido": "LINGUA", "nombre": "Francisco", "genero": "M", "fecha_nac": "2011-11-25"}, {"apellido": "LINGUA", "nombre": "Octavio", "genero": "M", "fecha_nac": "2013-01-28"}, {"apellido": "LUCRE", "nombre": "Balladares", "genero": "F", "fecha_nac": "2017-05-09"}, {"apellido": "LUPI", "nombre": "Bautista", "genero": "M", "fecha_nac": "2009-08-12"}, {"apellido": "MAGNASCO", "nombre": "Federica", "genero": "F", "fecha_nac": ""}, {"apellido": "MAGRI", "nombre": "Justina", "genero": "F", "fecha_nac": "2017-06-09"}, {"apellido": "MAGRI", "nombre": "Trinidad", "genero": "F", "fecha_nac": "2014-07-11"}, {"apellido": "MANA", "nombre": "Gio", "genero": "M", "fecha_nac": "2013-09-30"}, {"apellido": "MARTORELI", "nombre": "Faustino", "genero": "M", "fecha_nac": "2020-09-25"}, {"apellido": "MEDINA CABRAL", "nombre": "Pedro", "genero": "M", "fecha_nac": "2017-10-27"}, {"apellido": "OCAMPO", "nombre": "Josefina", "genero": "F", "fecha_nac": ""}, {"apellido": "OTONELLI", "nombre": "Ema", "genero": "F", "fecha_nac": "2019-07-05"}, {"apellido": "OTONELLI", "nombre": "Justino", "genero": "M", "fecha_nac": "2017-09-29"}, {"apellido": "OTONELLI", "nombre": "Monserrat", "genero": "F", "fecha_nac": "2020-06-16"}, {"apellido": "PALACIO", "nombre": "Facundo", "genero": "M", "fecha_nac": ""}, {"apellido": "PAMPURO AZCUETA", "nombre": "Ignacio", "genero": "M", "fecha_nac": "2015-03-09"}, {"apellido": "PAULS", "nombre": "Salvador", "genero": "M", "fecha_nac": "2018-12-01"}, {"apellido": "PAULS", "nombre": "Bautista", "genero": "M", "fecha_nac": "2013-06-05"}, {"apellido": "PAULS", "nombre": "Pura", "genero": "F", "fecha_nac": "2015-06-23"}, {"apellido": "PAULS", "nombre": "Vicente", "genero": "M", "fecha_nac": "2014-01-14"}, {"apellido": "PECOVICH", "nombre": "Tomas", "genero": "M", "fecha_nac": "2014-11-06"}, {"apellido": "PEIRETTI", "nombre": "Franca", "genero": "F", "fecha_nac": ""}, {"apellido": "PEREZ", "nombre": "Santiago", "genero": "M", "fecha_nac": ""}, {"apellido": "POZZOBON", "nombre": "Lara", "genero": "M", "fecha_nac": "2019-10-07"}, {"apellido": "RIVOIRA", "nombre": "Ernesto", "genero": "M", "fecha_nac": "2014-02-19"}, {"apellido": "ROLDAN", "nombre": "Lupe", "genero": "F", "fecha_nac": "2011-08-08"}, {"apellido": "SERRA", "nombre": "Francisco", "genero": "M", "fecha_nac": "2018-10-22"}, {"apellido": "SERRA", "nombre": "Jero", "genero": "M", "fecha_nac": ""}, {"apellido": "SOLARO", "nombre": "Salvador", "genero": "M", "fecha_nac": "2019-04-24"}, {"apellido": "TALANO", "nombre": "Benjamin", "genero": "F", "fecha_nac": "2019-07-05"}, {"apellido": "TAZZIOLI", "nombre": "Augusta", "genero": "F", "fecha_nac": "2018-11-03"}, {"apellido": "TAZZIOLI", "nombre": "Ignacia", "genero": "F", "fecha_nac": "2016-03-01"}, {"apellido": "TAZZIOLI", "nombre": "Luis Jnr", "genero": "M", "fecha_nac": "2020-10-21"}, {"apellido": "TORREZ VELEZ", "nombre": "Ignacio", "genero": "M", "fecha_nac": "2018-09-02"}, {"apellido": "TORREZ VELEZ", "nombre": "Josefina", "genero": "F", "fecha_nac": ""}, {"apellido": "UNAMUNO", "nombre": "Marga", "genero": "F", "fecha_nac": ""}, {"apellido": "VISSIO", "nombre": "Hilario", "genero": "M", "fecha_nac": "2018-10-10"}, {"apellido": "VISSIO", "nombre": "Pedro", "genero": "M", "fecha_nac": ""}, {"apellido": "ZISCIA", "nombre": "Maximo", "genero": "M", "fecha_nac": "2011-12-31"}];
 const CAT_ICONS  = {M18:"🏌️",ALBATROS:"🦆",AGUILA:"🦅",BIRDIE:"🐦",PAR:"⛳",PRINCIPIANTES:"🌱",INICIALES:"⭐"};
 const SCORE_CATS = ["M18","ALBATROS","AGUILA","BIRDIE","PAR","PRINCIPIANTES"];
 const MIXED_CATS = ["PRINCIPIANTES"]; // categorías que NO se separan por género
@@ -441,8 +452,8 @@ function subscribeData(){
   },e=>{console.error(e);setOnline(false);});
 }
 
-const PUB_TABS=[{id:"leaderboard",label:"Leaderboard"},{id:"historial",label:"Historial"},{id:"estadisticas",label:"Estadísticas"}];
-const ADM_TABS=[{id:"leaderboard",label:"Leaderboard"},{id:"cargar",label:"Cargar Score"},{id:"historial",label:"Historial"},{id:"estadisticas",label:"Estadísticas"},{id:"jugadores",label:"Jugadores"},{id:"backup",label:"Respaldo"}];
+const PUB_TABS=[{id:"leaderboard",label:"Leaderboard"},{id:"historial",label:"Historial"},{id:"estadisticas",label:"Estadísticas"},{id:"sponsors",label:"Sponsors"}];
+const ADM_TABS=[{id:"leaderboard",label:"Leaderboard"},{id:"cargar",label:"Cargar Score"},{id:"historial",label:"Historial"},{id:"estadisticas",label:"Estadísticas"},{id:"jugadores",label:"Jugadores"},{id:"backup",label:"Respaldo"},{id:"sponsors",label:"Sponsors"}];
 
 function buildNav(){
   const tabs=isAdmin?ADM_TABS:PUB_TABS;
@@ -460,7 +471,7 @@ window.showTab=id=>{
 };
 function renderCurrentTab(){
   const r={leaderboard:renderLeaderboard,cargar:renderCargar,historial:renderHistorial,
-           estadisticas:renderEstadisticas,jugadores:renderJugadores,backup:renderBackup};
+           estadisticas:renderEstadisticas,jugadores:renderJugadores,backup:renderBackup,sponsors:renderSponsors};
   if(r[currentTab])r[currentTab]();
 }
 
@@ -539,9 +550,15 @@ function renderLeaderboard(){
     html+=block;
   });
 
-  el.innerHTML=`<div class="lb-layout">
-    <div>${filters}${html||'<div class="empty-st"><span class="empty-icon">⛳</span>No hay scores aún</div>'}</div>
-    <aside class="lb-banner"><img src="${BANNER_SRC}" alt="Sponsors Junior Tour RCGC 2026"></aside>
+  el.innerHTML=`${filters}${html||'<div class="empty-st"><span class="empty-icon">⛳</span>No hay scores aún</div>'}`;
+}
+
+// ─── Sponsors ─────────────────────────────────────────
+function renderSponsors(){
+  const el=document.getElementById("tab-sponsors");
+  el.innerHTML=`<div class="lb-wrap" style="text-align:center">
+    <h2 style="margin-top:0">RCGC Junior Tour 2026 agradece los siguientes sponsors:</h2>
+    <img src="${BANNER_SRC}" alt="Sponsors Junior Tour RCGC 2026" style="width:100%;max-width:600px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.15)">
   </div>`;
 }
 window.filterLb=cat=>{activeLbCat=cat;renderLeaderboard();};
@@ -1016,7 +1033,10 @@ function renderJugadores(filter=""){
   }).join("");
   el.innerHTML=`<div class="card">
     <div class="sec-hdr"><h2>${players.length} Jugadores</h2>
-      <button class="btn btn-gold" onclick="openAdd()">+ Agregar</button></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="openImportFechas()">Importar fechas nac.</button>
+        <button class="btn btn-gold" onclick="openAdd()">+ Agregar</button>
+      </div></div>
     <input class="search-inp" id="psearch" placeholder="Buscar por nombre o año..." oninput="renderJugadores(this.value)" value="${filter}">
     <div style="overflow-x:auto"><table class="lb">
       <thead><tr><th>Jugador</th><th>Fecha nac.</th><th>Gén.</th><th>Categoría</th><th style="text-align:right">Acciones</th></tr></thead>
@@ -1086,6 +1106,67 @@ window.delPlayer=async id=>{
   catch(e){showToast("Error: "+e.message,"err");}
 };
 window.closeModal=()=>{document.getElementById("modal-ov").style.display="none";document.getElementById("modal-box").className="modal-box";};
+
+// ─── Importar fechas de nacimiento desde base de alumnos ──
+function normName(s){
+  return (s||"").toString().toUpperCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"") // quita tildes
+    .replace(/\s+/g," ").trim();
+}
+function buildImportPlan(){
+  const matched=[], noDate=[], noMatch=[];
+  ALUMNOS_FECHAS.forEach(a=>{
+    const an=normName(a.apellido), nn=normName(a.nombre);
+    const p=players.find(p=>normName(p.apellido)===an && normName(p.nombre)===nn);
+    if(!p){noMatch.push(a);return;}
+    if(!a.fecha_nac){noDate.push({a,p});return;}
+    matched.push({a,p,willUpdate: !p.fecha_nac});
+  });
+  return {matched,noDate,noMatch};
+}
+window.openImportFechas=()=>{
+  if(!isAdmin)return;
+  const {matched,noDate,noMatch}=buildImportPlan();
+  const toUpdate=matched.filter(m=>m.willUpdate);
+  const already=matched.filter(m=>!m.willUpdate);
+  document.getElementById("modal-box").className="modal-box modal-box-wide";
+  document.getElementById("modal-box").innerHTML=`
+    <h3>Importar fechas de nacimiento</h3>
+    <p style="font-size:13px;color:var(--tl)">Se cruza la base de alumnos (${ALUMNOS_FECHAS.length} registros) con los ${players.length} jugadores cargados, por apellido y nombre.</p>
+    <div class="imp-summary">
+      <div><b>${toUpdate.length}</b>Para actualizar</div>
+      <div><b>${already.length}</b>Ya tienen fecha</div>
+      <div><b>${noDate.length}</b>Sin fecha en la base</div>
+      <div><b>${noMatch.length}</b>Sin coincidencia</div>
+    </div>
+    ${toUpdate.length?`<table class="imp-table"><thead><tr><th>Jugador</th><th>Fecha a cargar</th></tr></thead>
+      <tbody>${toUpdate.map(m=>`<tr><td>${m.p.apellido}, ${m.p.nombre}</td><td class="imp-ok">${m.a.fecha_nac}</td></tr>`).join("")}</tbody></table>`:""}
+    ${noMatch.length?`<details style="margin-top:10px"><summary>Alumnos sin coincidencia (${noMatch.length})</summary>
+      <table class="imp-table"><tbody>${noMatch.map(a=>`<tr><td class="imp-skip">${a.apellido}, ${a.nombre}</td><td class="imp-skip">${a.genero||""} ${a.fecha_nac||"(sin fecha)"}</td></tr>`).join("")}</tbody></table></details>`:""}
+    ${noDate.length?`<details style="margin-top:10px"><summary>Alumnos sin fecha en la base (${noDate.length})</summary>
+      <table class="imp-table"><tbody>${noDate.map(({a,p})=>`<tr><td class="imp-skip">${p.apellido}, ${p.nombre}</td></tr>`).join("")}</tbody></table></details>`:""}
+    <div class="modal-acts">
+      <button class="btn" onclick="closeModal()">Cerrar</button>
+      ${toUpdate.length?`<button class="btn btn-primary" onclick="applyImportFechas()">Aplicar ${toUpdate.length} cambios</button>`:""}
+    </div>`;
+  document.getElementById("modal-ov").style.display="flex";
+};
+window.applyImportFechas=async()=>{
+  const {matched}=buildImportPlan();
+  const toUpdate=matched.filter(m=>m.willUpdate);
+  if(!toUpdate.length){closeModal();return;}
+  if(!confirm(`¿Confirmás cargar la fecha de nacimiento para ${toUpdate.length} jugadores?`))return;
+  let ok=0,err=0;
+  for(const m of toUpdate){
+    try{
+      const anio=parseInt(m.a.fecha_nac.split("-")[0]);
+      await setDoc(doc(db,"players",m.p.id),{fecha_nac:m.a.fecha_nac,anio},{merge:true});
+      ok++;
+    }catch(e){err++;}
+  }
+  closeModal();
+  showToast(err?`Listo: ${ok} actualizados, ${err} con error`:`¡${ok} jugadores actualizados!`);
+};
 
 // ─── Respaldo ─────────────────────────────────────────
 function renderBackup(){
