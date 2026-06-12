@@ -1120,7 +1120,7 @@ function buildImportPlan(){
     const p=players.find(p=>normName(p.apellido)===an && normName(p.nombre)===nn);
     if(!p){noMatch.push(a);return;}
     if(!a.fecha_nac){noDate.push({a,p});return;}
-    matched.push({a,p,willUpdate: !p.fecha_nac});
+    matched.push({a,p,willUpdate: !!a.fecha_nac && a.fecha_nac!==(p.fecha_nac||"")});
   });
   return {matched,noDate,noMatch};
 }
@@ -1135,12 +1135,12 @@ window.openImportFechas=()=>{
     <p style="font-size:13px;color:var(--tl)">Se cruza la base de alumnos (${ALUMNOS_FECHAS.length} registros) con los ${players.length} jugadores cargados, por apellido y nombre.</p>
     <div class="imp-summary">
       <div><b>${toUpdate.length}</b>Para actualizar</div>
-      <div><b>${already.length}</b>Ya tienen fecha</div>
+      <div><b>${already.length}</b>Ya correctas</div>
       <div><b>${noDate.length}</b>Sin fecha en la base</div>
       <div><b>${noMatch.length}</b>Sin coincidencia</div>
     </div>
-    ${toUpdate.length?`<table class="imp-table"><thead><tr><th>Jugador</th><th>Fecha a cargar</th></tr></thead>
-      <tbody>${toUpdate.map(m=>`<tr><td>${m.p.apellido}, ${m.p.nombre}</td><td class="imp-ok">${m.a.fecha_nac}</td></tr>`).join("")}</tbody></table>`:""}
+    ${toUpdate.length?`<table class="imp-table"><thead><tr><th>Jugador</th><th>Fecha actual</th><th>Fecha correcta</th></tr></thead>
+      <tbody>${toUpdate.map(m=>`<tr><td>${m.p.apellido}, ${m.p.nombre}</td><td class="imp-skip">${m.p.fecha_nac||"—"}</td><td class="imp-ok">${m.a.fecha_nac}</td></tr>`).join("")}</tbody></table>`:""}
     ${noMatch.length?`<details style="margin-top:10px"><summary>Alumnos sin coincidencia (${noMatch.length})</summary>
       <table class="imp-table"><tbody>${noMatch.map(a=>`<tr><td class="imp-skip">${a.apellido}, ${a.nombre}</td><td class="imp-skip">${a.genero||""} ${a.fecha_nac||"(sin fecha)"}</td></tr>`).join("")}</tbody></table></details>`:""}
     ${noDate.length?`<details style="margin-top:10px"><summary>Alumnos sin fecha en la base (${noDate.length})</summary>
