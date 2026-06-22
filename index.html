@@ -170,6 +170,11 @@ table.lb tr:hover td{background:#fafaf8}
 .cPAR{background:#fdeee9;color:#7a2e1a}
 .cINICIALES{background:#f0efec;color:#555}
 .neto-v{font-weight:600;color:var(--gd)}
+.gross-badge{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:10px;
+  font-size:10px;font-weight:600;background:var(--cream);color:var(--gd);
+  border:1px solid var(--bd);vertical-align:middle}
+table.lb tr.already-gross td{opacity:.6}
+table.lb tr.already-gross:hover td{opacity:.85}
 .empty-st{text-align:center;padding:40px 20px;color:var(--tl);font-size:14px}
 .empty-icon{font-size:36px;margin-bottom:12px;display:block}
 
@@ -489,7 +494,7 @@ function renderCurrentTab(){
 // ─── Leaderboard ─────────────────────────────────────
 // Genera una tabla de ranking para un conjunto de scores, ordenada por gross o neto
 function lbTable(cs, tipo){
-  // mejor score por jugador según el tipo
+  // mejor score por jugador según el tipo (para sort/display)
   const best={};
   cs.forEach(s=>{
     const val=tipo==="gross"?s.gross:s.neto;
@@ -497,19 +502,48 @@ function lbTable(cs, tipo){
     if(val<cur)best[s.jid]=s;
   });
   const sorted=Object.values(best).sort((a,b)=>(tipo==="gross"?a.gross-b.gross:a.neto-b.neto));
+
+  // Para Neto: calcular top-3 Gross para excluirlos del podio Neto
+  let topGrossJids=new Set();
+  if(tipo==="neto"){
+    const bestG={};
+    cs.forEach(s=>{
+      const cur=bestG[s.jid]?bestG[s.jid].gross:Infinity;
+      if(s.gross<cur)bestG[s.jid]=s;
+    });
+    const gSorted=Object.values(bestG).sort((a,b)=>a.gross-b.gross);
+    topGrossJids=new Set(gSorted.slice(0,3).map(s=>s.jid));
+  }
+
   let h=`<div style="overflow-x:auto"><table class="lb"><thead><tr>
     <th>Pos</th><th>Jugador</th>
     <th style="text-align:right">Gross</th>
     <th style="text-align:right">HCP</th>
     <th style="text-align:right">Neto</th>
   </tr></thead><tbody>`;
+  let prizeIdx=0;
   sorted.forEach((s,i)=>{
-    const rc=i===0?"r1":i===1?"r2":i===2?"r3":"rn";
+    let rc="rn";
+    let yaGanoGross=false;
+    if(tipo==="gross"){
+      rc=i===0?"r1":i===1?"r2":i===2?"r3":"rn";
+    }else{
+      // Neto: solo otorgar puesto de premio a quien no esté en el top-3 Gross
+      if(topGrossJids.has(s.jid)){
+        yaGanoGross=true;
+      }else{
+        if(prizeIdx===0)rc="r1";
+        else if(prizeIdx===1)rc="r2";
+        else if(prizeIdx===2)rc="r3";
+        prizeIdx++;
+      }
+    }
     const grossHi=tipo==="gross"?'style="text-align:right;font-weight:600;color:var(--gd)"':'style="text-align:right"';
     const netoHi =tipo==="neto" ?'class="neto-v"':"";
-    h+=`<tr class="clickable" onclick="verTarjeta('${s.id}')" title="Ver tarjeta del día">
+    const badge=yaGanoGross?` <span class="gross-badge" title="Ya premiado en Gross">🏆 Gross</span>`:"";
+    h+=`<tr class="clickable${yaGanoGross?" already-gross":""}" onclick="verTarjeta('${s.id}')" title="Ver tarjeta del día">
       <td><span class="rank ${rc}">${i+1}</span></td>
-      <td><span class="pname">${s.nombre}</span></td>
+      <td><span class="pname">${s.nombre}</span>${badge}</td>
       <td ${grossHi}>${s.gross}</td>
       <td style="text-align:right">${s.hcp>0?s.hcp:"—"}</td>
       <td style="text-align:right"><span ${netoHi}>${s.neto}</span></td></tr>`;
