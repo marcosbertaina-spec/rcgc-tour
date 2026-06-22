@@ -554,14 +554,46 @@ function lbTable(cs, tipo){
 
 function renderLeaderboard(){
   const el=document.getElementById("tab-leaderboard");
-  const filters=`<div class="cat-filters">${["TODAS",...SCORE_CATS].map(c=>
+  const LB_CATS=[...SCORE_CATS,"INICIALES"];
+  const filters=`<div class="cat-filters">${["TODAS",...LB_CATS].map(c=>
     `<button class="cfbtn${c===activeLbCat?" active":""}" onclick="filterLb('${c}')">${
       c==="TODAS"?"Todas":c==="M18"?"Menores 18":CAT_LABEL[c]}</button>`
   ).join("")}</div>`;
-  const cats=activeLbCat==="TODAS"?SCORE_CATS:[activeLbCat];
+  const cats=activeLbCat==="TODAS"?LB_CATS:[activeLbCat];
   let html="";
 
   cats.forEach(cat=>{
+    // Categoría INICIALES: listado de participaciones (sin Gross/Neto)
+    if(cat==="INICIALES"){
+      const inScores=scores.filter(s=>s.cat==="INICIALES");
+      if(!inScores.length)return;
+      // Agrupar por jugador, contar participaciones
+      const byJid={};
+      inScores.forEach(s=>{
+        if(!byJid[s.jid])byJid[s.jid]={s,count:0};
+        byJid[s.jid].count++;
+      });
+      const participantes=Object.values(byJid).sort((a,b)=>a.s.nombre.localeCompare(b.s.nombre,"es"));
+      let block=`<div class="lb-wrap"><div class="lb-cat-hdr">
+        <span class="lb-cat-icon">${CAT_ICONS.INICIALES}</span>
+        <span class="lb-cat-name">${CAT_LABEL.INICIALES}</span>
+        <span class="lb-cat-years">${CAT_YEARS.INICIALES}</span></div>
+        <div class="lb-block"><div class="lb-subhdr">
+          <span>Participaciones</span>
+          <span class="score-type">${participantes.length} ${participantes.length===1?"alumno":"alumnos"}</span></div>
+        <div style="overflow-x:auto"><table class="lb"><thead><tr>
+          <th style="width:50px">#</th><th>Jugador</th>
+          <th style="text-align:right">Participaciones</th>
+        </tr></thead><tbody>
+        ${participantes.map((p,i)=>`<tr>
+          <td><span class="rank rn">${i+1}</span></td>
+          <td><span class="pname">${p.s.nombre}</span></td>
+          <td style="text-align:right">${p.count}</td></tr>`).join("")}
+        </tbody></table></div></div></div>`;
+      html+=block;
+      return;
+    }
+
     const catScores=scores.filter(s=>s.cat===cat&&!s.participacion);
     if(!catScores.length)return;
     const isMixed=MIXED_CATS.includes(cat);
