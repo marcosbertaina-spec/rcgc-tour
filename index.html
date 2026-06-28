@@ -106,6 +106,7 @@ input[readonly]{background:var(--cream);color:var(--tm);cursor:default}
 
 /* ════════════════ HOLES GRID ════════════════ */
 .holes-grid{display:grid;gap:8px;margin-bottom:16px}
+.hg5{grid-template-columns:repeat(5,1fr)}
 .hg9,.hg18{grid-template-columns:repeat(9,1fr)}
 @media(max-width:520px){.hg9,.hg18{grid-template-columns:repeat(5,1fr)}}
 .hole-group-lbl{grid-column:1/-1;font-size:11px;font-weight:500;color:var(--tl);
@@ -415,7 +416,7 @@ function catFromYear(y){
 }
 
 let isAdmin=false,players=[],scores=[],activeLbCat="TODAS";
-let isIniciales=false,isM18=false,editingId=null,currentTab="leaderboard";
+let isIniciales=false,isM18=false,catHoles=9,editingId=null,currentTab="leaderboard";
 let unsubPlayers=null,unsubScores=null;
 
 function setOnline(on){
@@ -800,7 +801,7 @@ window.onCatOverride=()=>applyCategory(document.getElementById("c-cat").value);
 window.onHoleModeChange=()=>{
   // Solo aplica a Principiantes: reconstruye la grilla según 9/18
   const n=parseInt(document.getElementById("c-holemode").value);
-  isM18=(n===18); // reutilizamos isM18 como "modo 18 hoyos" para el cálculo
+  isM18=(n===18);catHoles=n;
   document.getElementById("c-hcp18-g").style.display=(n===18)?"block":"none";
   document.getElementById("c-scores-title").textContent=`Scores por hoyo (${n} hoyos)`;
   buildHoles(n);calcTotals();
@@ -809,12 +810,16 @@ window.onHoleModeChange=()=>{
 function applyCategory(cat){
   isIniciales=cat==="INICIALES";
   const isPrin=cat==="PRINCIPIANTES";
-  // Para categorías fijas isM18 indica 18 hoyos; para Principiantes lo decide el selector
+  const isPar=cat==="PAR";
+  // Determinar cantidad de hoyos según categoría
   if(isPrin){
     const hm=document.getElementById("c-holemode");
     isM18=hm?parseInt(hm.value)===18:false;
+    catHoles=isM18?18:9;
+  }else if(isPar){
+    isM18=false;catHoles=5; // PAR juega 5 hoyos
   }else{
-    isM18=false; // M18 juega 9 hoyos como el resto
+    isM18=false;catHoles=9;
   }
   document.getElementById("c-part-banner").style.display=isIniciales?"block":"none";
   document.getElementById("c-hcp-row").style.display="grid";
@@ -822,34 +827,36 @@ function applyCategory(cat){
   document.getElementById("c-scores-card").style.display=isIniciales?"none":"block";
   document.getElementById("c-btn-save").textContent=isIniciales?"Registrar Participación":"Guardar Score";
   if(!isIniciales){
-    const n=isM18?18:9;
-    document.getElementById("c-hcp18-g").style.display=(n===18)?"block":"none";
-    document.getElementById("c-scores-title").textContent=`Scores por hoyo (${n} hoyos)`;
-    buildHoles(n);calcTotals();
+    document.getElementById("c-hcp18-g").style.display=(catHoles===18)?"block":"none";
+    document.getElementById("c-scores-title").textContent=`Scores por hoyo (${catHoles} hoyos)`;
+    buildHoles(catHoles);calcTotals();
   }
 }
 
 function buildHoles(n){
   const c=document.getElementById("c-holes");c.innerHTML="";
-  const g=document.createElement("div");g.className=`holes-grid ${n===9?"hg9":"hg18"}`;
+  const cls=n===18?"hg18":n===5?"hg5":"hg9";
+  const g=document.createElement("div");g.className=`holes-grid ${cls}`;
   if(n===18){const l=document.createElement("div");l.className="hole-group-lbl";l.textContent="Front 9 — hoyos 1 al 9";g.appendChild(l);}
-  for(let i=1;i<=9;i++){const d=document.createElement("div");d.className="hole-inp";d.innerHTML=`<label>H${i}</label><input type="number" id="h${i}" min="1" max="20" oninput="calcTotals()" placeholder="—">`;g.appendChild(d);}
+  const limit=n===5?5:9;
+  for(let i=1;i<=limit;i++){const d=document.createElement("div");d.className="hole-inp";d.innerHTML=`<label>H${i}</label><input type="number" id="h${i}" min="1" max="20" oninput="calcTotals()" placeholder="—">`;g.appendChild(d);}
   if(n===18){
     const l=document.createElement("div");l.className="hole-group-lbl";l.textContent="Back 9 — hoyos 10 al 18";g.appendChild(l);
     for(let i=10;i<=18;i++){const d=document.createElement("div");d.className="hole-inp";d.innerHTML=`<label>H${i}</label><input type="number" id="h${i}" min="1" max="20" oninput="calcTotals()" placeholder="—">`;g.appendChild(d);}
   }
   c.appendChild(g);
-  document.getElementById("c-tot3").style.display=n===9?"grid":"none";
+  document.getElementById("c-tot3").style.display=(n===9||n===5)?"grid":"none";
   document.getElementById("c-tot5").style.display=n===18?"grid":"none";
 }
 
 window.calcTotals=()=>{
-  const n=isM18?18:9;
+  const n=catHoles;
   let fr=0,bk=0,okF=true,okB=true;
-  for(let i=1;i<=9;i++){const v=parseInt((document.getElementById("h"+i)||{}).value);if(isNaN(v))okF=false;else fr+=v;}
+  const limit=n===5?5:9;
+  for(let i=1;i<=limit;i++){const v=parseInt((document.getElementById("h"+i)||{}).value);if(isNaN(v))okF=false;else fr+=v;}
   if(n===18)for(let i=10;i<=18;i++){const v=parseInt((document.getElementById("h"+i)||{}).value);if(isNaN(v))okB=false;else bk+=v;}
-  const ok=n===9?okF:(okF&&okB),gross=fr+(n===18?bk:0);
-  if(n===9){const hcp=parseInt(document.getElementById("c-hcp").value)||0;
+  const ok=n===9||n===5?okF:(okF&&okB),gross=fr+(n===18?bk:0);
+  if(n===9||n===5){const hcp=parseInt(document.getElementById("c-hcp").value)||0;
     document.getElementById("t-g").textContent=okF?gross:"—";
     document.getElementById("t-h").textContent=hcp||"—";
     document.getElementById("t-n").textContent=okF?(gross-hcp):"—";
@@ -881,9 +888,9 @@ window.guardarScore=async()=>{
       await addDoc(collection(db,"scores"),{jid:pid,nombre,genero,cat:"INICIALES",fecha,torneo:torneo||"Sin nombre",participacion:true,holes:[],gross:0,hcp:0,neto:0,createdAt:serverTimestamp()});
       showToast("Participación registrada!");
     }else{
-      const n=isM18?18:9;const holes=[];
+      const n=catHoles;const holes=[];
       for(let i=1;i<=n;i++){const el=document.getElementById("h"+i);const v=parseInt(el?el.value:"");if(isNaN(v)||v<1){showToast("Completá todos los hoyos","err");btn.disabled=false;btn.textContent="Guardar Score";return;}holes.push(v);}
-      const hcp=parseInt(document.getElementById(isM18?"c-hcp18":"c-hcp").value)||0;
+      const hcp=parseInt(document.getElementById(n===18?"c-hcp18":"c-hcp").value)||0;
       const gross=holes.reduce((a,b)=>a+b,0);
       await addDoc(collection(db,"scores"),{jid:pid,nombre,genero,cat,fecha,torneo:torneo||"Sin nombre",holes,gross,hcp,neto:gross-hcp,participacion:false,createdAt:serverTimestamp()});
       showToast("Score guardado!");
@@ -898,7 +905,7 @@ window.clearCargar=()=>{
   const i=document.getElementById("c-jug-info");if(i)i.style.display="none";
   const sc=document.getElementById("c-scores-card");if(sc)sc.style.display="none";
   const hm=document.getElementById("c-holemode-row");if(hm)hm.style.display="none";
-  isIniciales=false;isM18=false;
+  isIniciales=false;isM18=false;catHoles=9;
   const lf=localStorage.getItem("rcgc_last_fecha")||new Date().toISOString().split("T")[0];
   const lt=localStorage.getItem("rcgc_last_torneo")||"";
   const f=document.getElementById("c-fecha");if(f)f.value=lf;
