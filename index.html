@@ -391,7 +391,8 @@ const LISTADO_MAYO_DUPLICADOS = [{"listado_apellido": "CACCIAVIGLIANI", "listado
 
 const CAT_ICONS  = {M18:"🏌️",ALBATROS:"🦆",AGUILA:"🦅",BIRDIE:"🐦",PAR:"⛳",PRINCIPIANTES:"🌱",INICIALES:"⭐"};
 const SCORE_CATS = ["M18","ALBATROS","AGUILA","BIRDIE","PAR","PRINCIPIANTES"];
-const MIXED_CATS = ["PRINCIPIANTES"]; // categorías que NO se separan por género
+const MIXED_CATS = ["PRINCIPIANTES","PAR"]; // categorías con Gross y Neto mixtos
+const NETO_ONLY_MIXED = ["M18","ALBATROS","AGUILA","BIRDIE"]; // Gross por género, Neto mixto
 const GEN_LABEL = {M:"Caballeros",F:"Damas"};
 const GEN_ICON  = {M:"🏌️‍♂️",F:"🏌️‍♀️"};
 // Resuelve el género de un score (los viejos no lo tienen, lo busca en el jugador)
@@ -597,6 +598,7 @@ function renderLeaderboard(){
     const catScores=scores.filter(s=>s.cat===cat&&!s.participacion);
     if(!catScores.length)return;
     const isMixed=MIXED_CATS.includes(cat);
+    const isNetoMixed=NETO_ONLY_MIXED.includes(cat);
 
     // Encabezado de categoría
     let block=`<div class="lb-wrap"><div class="lb-cat-hdr">
@@ -605,12 +607,24 @@ function renderLeaderboard(){
       <span class="lb-cat-years">${CAT_YEARS[cat]}</span></div>`;
 
     if(isMixed){
-      // Mixto: solo Gross y Neto (sin separar género)
+      // Gross mixto + Neto mixto (sin separar género)
       [["gross","Gross"],["neto","Neto"]].forEach(([t,lbl])=>{
         block+=`<div class="lb-block"><div class="lb-subhdr">
           <span>Clasificación general</span>
           <span class="score-type ${t}">${lbl}</span></div>${lbTable(catScores,t)}</div>`;
       });
+    }else if(isNetoMixed){
+      // Gross por género (Damas / Caballeros) + Neto mixto
+      [["F","Damas"],["M","Caballeros"]].forEach(([gen,genLbl])=>{
+        const gScores=catScores.filter(s=>scoreGenero(s)===gen);
+        if(!gScores.length)return;
+        block+=`<div class="lb-block"><div class="lb-subhdr">
+          <span>${GEN_ICON[gen]} ${genLbl}</span>
+          <span class="score-type gross">Gross</span></div>${lbTable(gScores,"gross")}</div>`;
+      });
+      block+=`<div class="lb-block"><div class="lb-subhdr">
+        <span>Clasificación general</span>
+        <span class="score-type neto">Neto</span></div>${lbTable(catScores,"neto")}</div>`;
     }else{
       // Por género × (gross, neto) = hasta 4 tablas
       [["F","Damas"],["M","Caballeros"]].forEach(([gen,genLbl])=>{
@@ -800,7 +814,7 @@ function applyCategory(cat){
     const hm=document.getElementById("c-holemode");
     isM18=hm?parseInt(hm.value)===18:false;
   }else{
-    isM18=cat==="M18";
+    isM18=false; // M18 juega 9 hoyos como el resto
   }
   document.getElementById("c-part-banner").style.display=isIniciales?"block":"none";
   document.getElementById("c-hcp-row").style.display="grid";
