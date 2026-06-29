@@ -178,6 +178,12 @@ table.lb tr:hover td{background:#fafaf8}
   border:1px solid var(--bd);vertical-align:middle}
 table.lb tr.already-gross td{opacity:.6}
 table.lb tr.already-gross:hover td{opacity:.85}
+table.lb tr.prize-gross-1 td{background:#daf0fb}
+table.lb tr.prize-gross-2 td{background:#daf0fb}
+table.lb tr.prize-gross-3 td{background:#daf0fb}
+table.lb tr.prize-neto-1 td{background:#fde8d0}
+table.lb tr.prize-neto-2 td{background:#fde8d0}
+table.lb tr.prize-neto-3 td{background:#fde8d0}
 .empty-st{text-align:center;padding:40px 20px;color:var(--tl);font-size:14px}
 .empty-icon{font-size:36px;margin-bottom:12px;display:block}
 
@@ -547,38 +553,42 @@ function lbTable(cs, tipo, grossWinnersJids=null){
     }
   }
 
+  const isNeto=tipo==="neto";
   let h=`<div style="overflow-x:auto"><table class="lb"><thead><tr>
     <th>Pos</th><th>Jugador</th>
     <th style="text-align:right">Gross</th>
-    <th style="text-align:right">HCP</th>
-    <th style="text-align:right">Neto</th>
+    ${isNeto?`<th style="text-align:right">HCP</th><th style="text-align:right">Neto</th>`:""}
   </tr></thead><tbody>`;
+  const MEDALS=["🥇","🥈","🥉"];
   let prizeIdx=0;
   sorted.forEach((s,i)=>{
     let rc="rn";
     let yaGanoGross=false;
-    if(tipo==="gross"){
-      rc=i===0?"r1":i===1?"r2":i===2?"r3":"rn";
+    let prizeClass="";
+    let medal="";
+    if(!isNeto){
+      if(i===0){rc="r1";prizeClass="prize-gross-1";medal=MEDALS[0];}
+      else if(i===1){rc="r2";prizeClass="prize-gross-2";medal=MEDALS[1];}
+      else if(i===2){rc="r3";prizeClass="prize-gross-3";medal=MEDALS[2];}
     }else{
-      // Neto: solo otorgar puesto de premio a quien no esté en el top-3 Gross
       if(topGrossJids.has(s.jid)){
         yaGanoGross=true;
       }else{
-        if(prizeIdx===0)rc="r1";
-        else if(prizeIdx===1)rc="r2";
-        else if(prizeIdx===2)rc="r3";
+        if(prizeIdx===0){rc="r1";prizeClass="prize-neto-1";medal=MEDALS[0];}
+        else if(prizeIdx===1){rc="r2";prizeClass="prize-neto-2";medal=MEDALS[1];}
+        else if(prizeIdx===2){rc="r3";prizeClass="prize-neto-3";medal=MEDALS[2];}
         prizeIdx++;
       }
     }
-    const grossHi=tipo==="gross"?'style="text-align:right;font-weight:600;color:var(--gd)"':'style="text-align:right"';
-    const netoHi =tipo==="neto" ?'class="neto-v"':"";
+    const grossHi=!isNeto?'style="text-align:right;font-weight:600;color:var(--gd)"':'style="text-align:right"';
     const badge=yaGanoGross?` <span class="gross-badge" title="Ya premiado en Gross">🏆 Gross</span>`:"";
-    h+=`<tr class="clickable${yaGanoGross?" already-gross":""}" onclick="verTarjeta('${s.id}')" title="Ver tarjeta del día">
+    const medalSpan=medal?` <span style="font-size:16px">${medal}</span>`:"";
+    h+=`<tr class="clickable${yaGanoGross?" already-gross":""}${prizeClass?" "+prizeClass:""}" onclick="verTarjeta('${s.id}')" title="Ver tarjeta del día">
       <td><span class="rank ${rc}">${i+1}</span></td>
-      <td><span class="pname">${s.nombre}</span>${badge}</td>
+      <td><span class="pname">${s.nombre}</span>${medalSpan}${badge}</td>
       <td ${grossHi}>${s.gross}</td>
-      <td style="text-align:right">${s.hcp>0?s.hcp:"—"}</td>
-      <td style="text-align:right"><span ${netoHi}>${s.neto}</span></td></tr>`;
+      ${isNeto?`<td style="text-align:right">${s.hcp>0?s.hcp:"—"}</td><td style="text-align:right"><span class="neto-v">${s.neto}</span></td>`:""}
+      </tr>`;
   });
   h+=`</tbody></table></div>`;
   return h;
