@@ -107,6 +107,8 @@ input[readonly]{background:var(--cream);color:var(--tm);cursor:default}
 /* ════════════════ HOLES GRID ════════════════ */
 .holes-grid{display:grid;gap:8px;margin-bottom:16px}
 .hg5{grid-template-columns:repeat(5,1fr)}
+.hole-par{display:block;font-size:9px;font-weight:600;color:var(--gd);text-align:center;margin-top:1px}
+.hole-yds{display:block;font-size:9px;color:var(--tl);text-align:center;margin-bottom:2px}
 .hg9,.hg18{grid-template-columns:repeat(9,1fr)}
 @media(max-width:520px){.hg9,.hg18{grid-template-columns:repeat(5,1fr)}}
 .hole-group-lbl{grid-column:1/-1;font-size:11px;font-weight:500;color:var(--tl);
@@ -283,6 +285,15 @@ table.lb tr.already-gross:hover td{opacity:.85}
 .sc-cell.tot{background:var(--gold);color:var(--gd);font-weight:700}
 .sc-cell .hn{font-size:9px;color:var(--tl);display:block}
 .sc-cell.hd .hn{color:rgba(255,255,255,.7)}
+.sc-cell.par-lbl{background:#d6ecd6;color:#2a5c2a;font-weight:600;font-size:10px}
+.sc-cell.par-val{background:#edf7ed;color:#2a5c2a;font-size:12px}
+.sc-cell.yds-lbl{background:#e3eaf5;color:#2a4a7a;font-weight:600;font-size:10px}
+.sc-cell.yds-val{background:#f0f4fb;color:#2a4a7a;font-size:11px}
+.sc-cell.sc-eagle{background:#ffd700;color:#7a5000;font-weight:700}
+.sc-cell.sc-birdie{background:#b8e6b8;color:#1a5c1a;font-weight:600}
+.sc-cell.sc-par{background:var(--cream)}
+.sc-cell.sc-bogey{background:#fde8e8;color:#8b0000}
+.sc-cell.sc-dbogey{background:#f5c0c0;color:#8b0000;font-weight:600}
 .sc-totals{display:flex;justify-content:center;gap:24px;margin-top:16px;padding-top:14px;border-top:1px solid var(--cream-d)}
 .sc-tot-item{text-align:center}
 .sc-tot-item .l{font-size:11px;color:var(--tl);text-transform:uppercase;letter-spacing:.04em}
@@ -358,7 +369,7 @@ table.lb tr.already-gross:hover td{opacity:.85}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, getDocs, addDoc, setDoc, deleteDoc,
+import { getFirestore, collection, doc, getDocs, addDoc, setDoc, deleteDoc, updateDoc,
          onSnapshot, query, orderBy, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -394,6 +405,14 @@ const CAT_ICONS  = {M18:"🏌️",ALBATROS:"🦆",AGUILA:"🦅",BIRDIE:"🐦",PA
 const SCORE_CATS = ["M18","ALBATROS","AGUILA","BIRDIE","PAR","PRINCIPIANTES"];
 const MIXED_CATS = ["PRINCIPIANTES","PAR"]; // categorías con Gross y Neto mixtos
 const NETO_ONLY_MIXED = ["M18","ALBATROS","AGUILA","BIRDIE"]; // Gross por género, Neto mixto
+const HOLE_PAR_IDA    = [4,4,4,4,5,3,4,3,4]; // hoyos 1-9
+const HOLE_PAR_VUELTA = [4,3,4,4,5,5,3,4,5]; // hoyos 10-18
+const HOLE_HCP_IDA = [11,13,1,3,9,17,15,4,14];
+const HOLE_YDS = {AGUILA:[268,117,305,229,380,127,264,222,289],BIRDIE:[185,89,245,175,301,72,168,175,197]};
+const CAT_DEF_HOLES  = {M18:9,ALBATROS:9,AGUILA:9,BIRDIE:9,PAR:5,PRINCIPIANTES:9};
+const CAT_DEF_VUELTA = {M18:true,ALBATROS:false,AGUILA:false,BIRDIE:false,PAR:false,PRINCIPIANTES:false};
+const CAT_HOLE_OPTS  = {M18:[9,18],ALBATROS:[9,18],AGUILA:[9,18],BIRDIE:[9,18],PAR:[4,5,6],PRINCIPIANTES:[9,18]};
+const CATS_VUELTA    = ["M18","ALBATROS","AGUILA","BIRDIE"];
 const GEN_LABEL = {M:"Caballeros",F:"Damas"};
 const GEN_ICON  = {M:"🏌️‍♂️",F:"🏌️‍♀️"};
 // Resuelve el género de un score (los viejos no lo tienen, lo busca en el jugador)
@@ -415,8 +434,8 @@ function catFromYear(y){
   return null;
 }
 
-let isAdmin=false,players=[],scores=[],activeLbCat="TODAS";
-let isIniciales=false,isM18=false,catHoles=9,editingId=null,currentTab="leaderboard";
+let isAdmin=false,players=[],scores=[],activeLbCat="TODAS",activeLbTorneo="TODOS";
+let isIniciales=false,isM18=false,catHoles=9,catVuelta=false,editingId=null,currentTab="leaderboard";
 let unsubPlayers=null,unsubScores=null;
 
 function setOnline(on){
@@ -557,17 +576,26 @@ function lbTable(cs, tipo){
 function renderLeaderboard(){
   const el=document.getElementById("tab-leaderboard");
   const LB_CATS=[...SCORE_CATS,"INICIALES"];
+  // Torneos disponibles
+  const torneos=["TODOS",...new Set(scores.map(s=>s.torneo).filter(Boolean))].sort((a,b)=>a==="TODOS"?-1:b==="TODOS"?1:b.localeCompare(a));
+  const torneoSel=`<div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <label style="font-size:13px;font-weight:500;color:var(--tm)">Torneo:</label>
+    <select style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--cream-d);background:var(--white)" onchange="filterLbTorneo(this.value)">
+      ${torneos.map(t=>`<option value="${t}" ${t===activeLbTorneo?"selected":""}>${t==="TODOS"?"Todos los torneos":t}</option>`).join("")}
+    </select></div>`;
   const filters=`<div class="cat-filters">${["TODAS",...LB_CATS].map(c=>
     `<button class="cfbtn${c===activeLbCat?" active":""}" onclick="filterLb('${c}')">${
       c==="TODAS"?"Todas":c==="M18"?"Menores 18":CAT_LABEL[c]}</button>`
   ).join("")}</div>`;
   const cats=activeLbCat==="TODAS"?LB_CATS:[activeLbCat];
+  // Scores filtrados por torneo
+  const scoresFiltered=activeLbTorneo==="TODOS"?scores:scores.filter(s=>s.torneo===activeLbTorneo);
   let html="";
 
   cats.forEach(cat=>{
-    // Categoría INICIALES: listado de participaciones (sin Gross/Neto)
-    if(cat==="INICIALES"){
-      const inScores=scores.filter(s=>s.cat==="INICIALES");
+    // Categoría INICIALES y PRINCIPIANTES: listado de participaciones (sin Gross/Neto)
+    if(cat==="INICIALES"||cat==="PRINCIPIANTES"){
+      const inScores=scoresFiltered.filter(s=>s.cat===cat);
       if(!inScores.length)return;
       // Agrupar por jugador, contar participaciones
       const byJid={};
@@ -577,9 +605,9 @@ function renderLeaderboard(){
       });
       const participantes=Object.values(byJid).sort((a,b)=>a.s.nombre.localeCompare(b.s.nombre,"es"));
       let block=`<div class="lb-wrap"><div class="lb-cat-hdr">
-        <span class="lb-cat-icon">${CAT_ICONS.INICIALES}</span>
-        <span class="lb-cat-name">${CAT_LABEL.INICIALES}</span>
-        <span class="lb-cat-years">${CAT_YEARS.INICIALES}</span></div>
+        <span class="lb-cat-icon">${CAT_ICONS[cat]}</span>
+        <span class="lb-cat-name">${CAT_LABEL[cat]}</span>
+        <span class="lb-cat-years">${CAT_YEARS[cat]}</span></div>
         <div class="lb-block"><div class="lb-subhdr">
           <span>Participaciones</span>
           <span class="score-type">${participantes.length} ${participantes.length===1?"alumno":"alumnos"}</span></div>
@@ -596,7 +624,7 @@ function renderLeaderboard(){
       return;
     }
 
-    const catScores=scores.filter(s=>s.cat===cat&&!s.participacion);
+    const catScores=scoresFiltered.filter(s=>s.cat===cat&&!s.participacion);
     if(!catScores.length)return;
     const isMixed=MIXED_CATS.includes(cat);
     const isNetoMixed=NETO_ONLY_MIXED.includes(cat);
@@ -642,7 +670,7 @@ function renderLeaderboard(){
     html+=block;
   });
 
-  el.innerHTML=`${filters}${html||'<div class="empty-st"><span class="empty-icon">⛳</span>No hay scores aún</div>'}`;
+  el.innerHTML=`${torneoSel}${filters}${html||'<div class="empty-st"><span class="empty-icon">⛳</span>No hay scores aún</div>'}`;
 }
 
 // ─── Sponsors ─────────────────────────────────────────
@@ -654,6 +682,7 @@ function renderSponsors(){
   </div>`;
 }
 window.filterLb=cat=>{activeLbCat=cat;renderLeaderboard();};
+window.filterLbTorneo=t=>{activeLbTorneo=t;renderLeaderboard()};
 
 // ─── Tarjeta del día (scorecard) ──────────────────────
 window.verTarjeta=id=>{
@@ -661,27 +690,68 @@ window.verTarjeta=id=>{
   if(!s||!s.holes||!s.holes.length){showToast("Sin detalle de hoyos","err");return;}
   const n=s.holes.length;
   const gen=scoreGenero(s);
-  let cells="", nums="";
-  // Front 9
-  let front=0;
-  for(let i=0;i<9;i++){front+=s.holes[i];}
-  let back=0; if(n===18)for(let i=9;i<18;i++)back+=s.holes[i];
-  // Construir grilla: para 9 hoyos una fila, para 18 dos bloques
-  function bloque(ini,fin,label,subtot){
-    let h=`<div style="font-size:11px;font-weight:600;color:var(--tl);text-transform:uppercase;letter-spacing:.05em;margin:10px 0 4px">${label}</div>`;
-    h+=`<div class="sc-grid">`;
+  const isVuelta=s.vuelta===true;
+
+  // Obtener par y yardas según categoría y recorrido
+  function getParArr(cat,vuelta,len){
+    if(vuelta) return HOLE_PAR_VUELTA.slice(0,len);
+    return HOLE_PAR_IDA.slice(0,len);
+  }
+  function getYdsArr(cat,vuelta,len){
+    if(vuelta||!HOLE_YDS[cat])return null;
+    return HOLE_YDS[cat].slice(0,len);
+  }
+
+  function bloque(holes,startHole,label,parArr,ydsArr){
+    const hn=holes.length;
+    const cols=hn+2;
+    const gs=`display:grid;grid-template-columns:56px repeat(${hn},1fr) 44px;gap:3px;margin-bottom:3px;font-size:12px`;
+    const lbl=label?`<div style="font-size:11px;font-weight:600;color:var(--tl);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 5px">${label}</div>`:"";
+    let h=lbl+`<div style="${gs}">`;
+    // Fila hoyo
     h+=`<div class="sc-cell hd">Hoyo</div>`;
-    for(let i=ini;i<fin;i++)h+=`<div class="sc-cell hd">${i+1}</div>`;
+    for(let i=0;i<hn;i++)h+=`<div class="sc-cell hd">${startHole+i}</div>`;
     h+=`<div class="sc-cell tot">TOT</div>`;
+    // Fila par
+    if(parArr){
+      const pt=parArr.reduce((a,b)=>a+b,0);
+      h+=`<div class="sc-cell par-lbl">Par</div>`;
+      for(let i=0;i<hn;i++)h+=`<div class="sc-cell par-val">${parArr[i]??'—'}</div>`;
+      h+=`<div class="sc-cell par-lbl">${pt}</div>`;
+    }
+    // Fila yardas
+    if(ydsArr){
+      const yt=ydsArr.reduce((a,b)=>a+b,0);
+      h+=`<div class="sc-cell yds-lbl">Yds</div>`;
+      for(let i=0;i<hn;i++)h+=`<div class="sc-cell yds-val">${ydsArr[i]??'—'}</div>`;
+      h+=`<div class="sc-cell yds-lbl">${yt}</div>`;
+    }
+    // Fila score (con color relativo al par)
+    const subtot=holes.reduce((a,b)=>a+b,0);
     h+=`<div class="sc-cell hd">Score</div>`;
-    for(let i=ini;i<fin;i++)h+=`<div class="sc-cell">${s.holes[i]}</div>`;
-    h+=`<div class="sc-cell tot">${subtot}</div>`;
-    h+=`</div>`;
+    for(let i=0;i<hn;i++){
+      const diff=parArr&&parArr[i]!=null?holes[i]-parArr[i]:null;
+      let cls="sc-cell";
+      if(diff!==null){if(diff<=-2)cls+=" sc-eagle";else if(diff===-1)cls+=" sc-birdie";else if(diff===0)cls+=" sc-par";else if(diff===1)cls+=" sc-bogey";else cls+=" sc-dbogey";}
+      h+=`<div class="${cls}">${holes[i]}</div>`;
+    }
+    h+=`<div class="sc-cell tot">${subtot}</div></div>`;
     return h;
   }
+
   let body="";
-  if(n===9){body=bloque(0,9,"Hoyos 1 al 9",front);}
-  else{body=bloque(0,9,"Front 9 (hoyos 1-9)",front)+bloque(9,18,"Back 9 (hoyos 10-18)",back);}
+  if(n===18){
+    const front=s.holes.slice(0,9),back=s.holes.slice(9);
+    const fPar=getParArr(s.cat,false,9),fYds=getYdsArr(s.cat,false,9);
+    body=bloque(front,1,"Front 9 — hoyos 1 al 9",fPar,fYds)
+        +bloque(back,10,"Back 9 — hoyos 10 al 18",null,null);
+  }else{
+    const startH=isVuelta?10:1;
+    const label=n===9?(isVuelta?"Vuelta — hoyos 10 al 18":"Ida — hoyos 1 al 9"):`Hoyos 1 al ${n}`;
+    const parArr=getParArr(s.cat,isVuelta,n);
+    const ydsArr=getYdsArr(s.cat,isVuelta,n);
+    body=bloque(s.holes,startH,label,parArr,ydsArr);
+  }
   document.getElementById("modal-box").className="modal-box scorecard";
   document.getElementById("modal-box").innerHTML=`
     <div class="sc-head">
@@ -746,9 +816,12 @@ function renderCargar(){
         </div>
         <div class="fr" id="c-holemode-row" style="display:none">
           <div class="fg"><label>Cantidad de hoyos</label>
-            <select id="c-holemode" onchange="onHoleModeChange()">
-              <option value="9">9 hoyos</option>
-              <option value="18">18 hoyos</option>
+            <select id="c-holemode" onchange="onHoleModeChange()"></select>
+          </div>
+          <div class="fg" id="c-vuelta-g" style="display:none"><label>Recorrido</label>
+            <select id="c-vuelta" onchange="onVueltaChange()">
+              <option value="ida">Ida — hoyos 1 al 9</option>
+              <option value="vuelta">Vuelta — hoyos 10 al 18</option>
             </select>
           </div>
         </div>
@@ -799,31 +872,41 @@ window.onJugadorChange=()=>{
 };
 window.onCatOverride=()=>applyCategory(document.getElementById("c-cat").value);
 window.onHoleModeChange=()=>{
-  // Solo aplica a Principiantes: reconstruye la grilla según 9/18
   const n=parseInt(document.getElementById("c-holemode").value);
   isM18=(n===18);catHoles=n;
+  const cat=document.getElementById("c-cat")?document.getElementById("c-cat").value:"";
+  const showVuelta=CATS_VUELTA.includes(cat)&&n===9;
+  document.getElementById("c-vuelta-g").style.display=showVuelta?"block":"none";
+  if(showVuelta){catVuelta=document.getElementById("c-vuelta").value==="vuelta";}else{catVuelta=false;}
   document.getElementById("c-hcp18-g").style.display=(n===18)?"block":"none";
   document.getElementById("c-scores-title").textContent=`Scores por hoyo (${n} hoyos)`;
   buildHoles(n);calcTotals();
 };
+window.onVueltaChange=()=>{
+  catVuelta=document.getElementById("c-vuelta").value==="vuelta";
+  buildHoles(catHoles);calcTotals();
+};
 
 function applyCategory(cat){
-  isIniciales=cat==="INICIALES";
-  const isPrin=cat==="PRINCIPIANTES";
-  const isPar=cat==="PAR";
-  // Determinar cantidad de hoyos según categoría
-  if(isPrin){
-    const hm=document.getElementById("c-holemode");
-    isM18=hm?parseInt(hm.value)===18:false;
-    catHoles=isM18?18:9;
-  }else if(isPar){
-    isM18=false;catHoles=5; // PAR juega 5 hoyos
-  }else{
-    isM18=false;catHoles=9;
+  isIniciales=(cat==="INICIALES"||cat==="PRINCIPIANTES");
+  // Populate hole options
+  const hm=document.getElementById("c-holemode");
+  if(hm&&CAT_HOLE_OPTS[cat]){
+    hm.innerHTML=CAT_HOLE_OPTS[cat].map(v=>`<option value="${v}">${v} hoyos</option>`).join("");
   }
+  // Set defaults
+  catHoles=CAT_DEF_HOLES[cat]||9;
+  catVuelta=CAT_DEF_VUELTA[cat]||false;
+  isM18=(catHoles===18);
+  if(hm)hm.value=catHoles;
+  const vueltaSel=document.getElementById("c-vuelta");
+  if(vueltaSel)vueltaSel.value=catVuelta?"vuelta":"ida";
+  const showVuelta=CATS_VUELTA.includes(cat)&&catHoles===9;
+  const vg=document.getElementById("c-vuelta-g");
+  if(vg)vg.style.display=showVuelta?"block":"none";
   document.getElementById("c-part-banner").style.display=isIniciales?"block":"none";
   document.getElementById("c-hcp-row").style.display="grid";
-  document.getElementById("c-holemode-row").style.display=isPrin?"grid":"none";
+  document.getElementById("c-holemode-row").style.display=isIniciales?"none":"grid";
   document.getElementById("c-scores-card").style.display=isIniciales?"none":"block";
   document.getElementById("c-btn-save").textContent=isIniciales?"Registrar Participación":"Guardar Score";
   if(!isIniciales){
@@ -834,29 +917,52 @@ function applyCategory(cat){
 }
 
 function buildHoles(n){
+  const cat=document.getElementById("c-cat")?document.getElementById("c-cat").value:"";
+  const yds=HOLE_YDS[cat]||null;
   const c=document.getElementById("c-holes");c.innerHTML="";
-  const cls=n===18?"hg18":n===5?"hg5":"hg9";
+  const cls=n===18?"hg18":(n<=6)?"hg5":"hg9";
   const g=document.createElement("div");g.className=`holes-grid ${cls}`;
-  if(n===18){const l=document.createElement("div");l.className="hole-group-lbl";l.textContent="Front 9 — hoyos 1 al 9";g.appendChild(l);}
-  const limit=n===5?5:9;
-  for(let i=1;i<=limit;i++){const d=document.createElement("div");d.className="hole-inp";d.innerHTML=`<label>H${i}</label><input type="number" id="h${i}" min="1" max="20" oninput="calcTotals()" placeholder="—">`;g.appendChild(d);}
+  function addHole(num,parIdx,useVuelta){
+    const d=document.createElement("div");d.className="hole-inp";
+    const parArr=useVuelta?HOLE_PAR_VUELTA:HOLE_PAR_IDA;
+    const par=(parIdx!==null&&parArr[parIdx]!==undefined)?parArr[parIdx]:null;
+    const y=(parIdx!==null&&yds&&parIdx<yds.length)?yds[parIdx]:null;
+    d.innerHTML=`<label>H${num}</label>`
+      +(par!==null?`<span class="hole-par">P${par}</span>`:"")
+      +(y!==null?`<span class="hole-yds">${y}y</span>`:"")
+      +`<input type="number" id="h${num}" min="1" max="10" oninput="calcTotals()" placeholder="—">`;
+    g.appendChild(d);
+  }
   if(n===18){
-    const l=document.createElement("div");l.className="hole-group-lbl";l.textContent="Back 9 — hoyos 10 al 18";g.appendChild(l);
-    for(let i=10;i<=18;i++){const d=document.createElement("div");d.className="hole-inp";d.innerHTML=`<label>H${i}</label><input type="number" id="h${i}" min="1" max="20" oninput="calcTotals()" placeholder="—">`;g.appendChild(d);}
+    const l=document.createElement("div");l.className="hole-group-lbl";l.textContent="Front 9 — hoyos 1 al 9";g.appendChild(l);
+    for(let i=0;i<9;i++)addHole(i+1,i,false);
+    const l2=document.createElement("div");l2.className="hole-group-lbl";l2.textContent="Back 9 — hoyos 10 al 18";g.appendChild(l2);
+    for(let i=0;i<9;i++)addHole(i+10,i,true);
+  }else if(catVuelta){
+    const l=document.createElement("div");l.className="hole-group-lbl";l.textContent="Vuelta — hoyos 10 al 18";g.appendChild(l);
+    for(let i=0;i<n;i++)addHole(i+10,i,true);
+  }else{
+    if(n===9){const l=document.createElement("div");l.className="hole-group-lbl";l.textContent="Ida — hoyos 1 al 9";g.appendChild(l);}
+    for(let i=0;i<n;i++)addHole(i+1,i,false);
   }
   c.appendChild(g);
-  document.getElementById("c-tot3").style.display=(n===9||n===5)?"grid":"none";
+  document.getElementById("c-tot3").style.display=(n!==18)?"grid":"none";
   document.getElementById("c-tot5").style.display=n===18?"grid":"none";
 }
 
 window.calcTotals=()=>{
   const n=catHoles;
   let fr=0,bk=0,okF=true,okB=true;
-  const limit=n===5?5:9;
-  for(let i=1;i<=limit;i++){const v=parseInt((document.getElementById("h"+i)||{}).value);if(isNaN(v))okF=false;else fr+=v;}
-  if(n===18)for(let i=10;i<=18;i++){const v=parseInt((document.getElementById("h"+i)||{}).value);if(isNaN(v))okB=false;else bk+=v;}
-  const ok=n===9||n===5?okF:(okF&&okB),gross=fr+(n===18?bk:0);
-  if(n===9||n===5){const hcp=parseInt(document.getElementById("c-hcp").value)||0;
+  if(n===18){
+    for(let i=1;i<=9;i++){const v=parseInt((document.getElementById("h"+i)||{}).value);if(isNaN(v))okF=false;else fr+=v;}
+    for(let i=10;i<=18;i++){const v=parseInt((document.getElementById("h"+i)||{}).value);if(isNaN(v))okB=false;else bk+=v;}
+  }else if(catVuelta){
+    for(let i=10;i<10+n;i++){const v=parseInt((document.getElementById("h"+i)||{}).value);if(isNaN(v))okF=false;else fr+=v;}
+  }else{
+    for(let i=1;i<=n;i++){const v=parseInt((document.getElementById("h"+i)||{}).value);if(isNaN(v))okF=false;else fr+=v;}
+  }
+  const ok=n===18?(okF&&okB):okF,gross=fr+(n===18?bk:0);
+  if(n!==18){const hcp=parseInt(document.getElementById("c-hcp").value)||0;
     document.getElementById("t-g").textContent=okF?gross:"—";
     document.getElementById("t-h").textContent=hcp||"—";
     document.getElementById("t-n").textContent=okF?(gross-hcp):"—";
@@ -885,14 +991,16 @@ window.guardarScore=async()=>{
   btn.disabled=true;btn.textContent="Guardando...";
   try{
     if(isIniciales){
-      await addDoc(collection(db,"scores"),{jid:pid,nombre,genero,cat:"INICIALES",fecha,torneo:torneo||"Sin nombre",participacion:true,holes:[],gross:0,hcp:0,neto:0,createdAt:serverTimestamp()});
+      await addDoc(collection(db,"scores"),{jid:pid,nombre,genero,cat,fecha,torneo:torneo||"Sin nombre",participacion:true,holes:[],gross:0,hcp:0,neto:0,createdAt:serverTimestamp()});
       showToast("Participación registrada!");
     }else{
       const n=catHoles;const holes=[];
-      for(let i=1;i<=n;i++){const el=document.getElementById("h"+i);const v=parseInt(el?el.value:"");if(isNaN(v)||v<1){showToast("Completá todos los hoyos","err");btn.disabled=false;btn.textContent="Guardar Score";return;}holes.push(v);}
+      const startH=n===18?1:(catVuelta?10:1);
+      const endH  =n===18?18:(catVuelta?10+n-1:n);
+      for(let i=startH;i<=endH;i++){const el=document.getElementById("h"+i);const v=parseInt(el?el.value:"");if(isNaN(v)||v<1){showToast("Completá todos los hoyos","err");btn.disabled=false;btn.textContent="Guardar Score";return;}holes.push(v);}
       const hcp=parseInt(document.getElementById(n===18?"c-hcp18":"c-hcp").value)||0;
       const gross=holes.reduce((a,b)=>a+b,0);
-      await addDoc(collection(db,"scores"),{jid:pid,nombre,genero,cat,fecha,torneo:torneo||"Sin nombre",holes,gross,hcp,neto:gross-hcp,participacion:false,createdAt:serverTimestamp()});
+      await addDoc(collection(db,"scores"),{jid:pid,nombre,genero,cat,fecha,torneo:torneo||"Sin nombre",holes,gross,hcp,neto:gross-hcp,vuelta:catVuelta,participacion:false,createdAt:serverTimestamp()});
       showToast("Score guardado!");
     }
     clearCargar();
@@ -905,7 +1013,7 @@ window.clearCargar=()=>{
   const i=document.getElementById("c-jug-info");if(i)i.style.display="none";
   const sc=document.getElementById("c-scores-card");if(sc)sc.style.display="none";
   const hm=document.getElementById("c-holemode-row");if(hm)hm.style.display="none";
-  isIniciales=false;isM18=false;catHoles=9;
+  isIniciales=false;isM18=false;catHoles=9;catVuelta=false;
   const lf=localStorage.getItem("rcgc_last_fecha")||new Date().toISOString().split("T")[0];
   const lt=localStorage.getItem("rcgc_last_torneo")||"";
   const f=document.getElementById("c-fecha");if(f)f.value=lf;
@@ -968,7 +1076,7 @@ function renderHistorial(){
     <td style="text-align:right">${esInicial?"—":s.gross}</td>
     <td style="text-align:right">${esInicial?"—":(s.hcp>0?s.hcp:"—")}</td>
     <td style="text-align:right">${esInicial?'<span style="color:var(--tl);font-size:12px">participó</span>':`<span class="neto-v">${s.neto}</span>`}</td>
-    ${isAdmin?`<td><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();delScore('${s.id}')">Borrar</button></td>`:"<td></td>"}
+    ${isAdmin?`<td style="white-space:nowrap"><button class="btn btn-sm" onclick="event.stopPropagation();editScore('${s.id}')" style="margin-right:4px">Editar</button><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();delScore('${s.id}')">Borrar</button></td>`:"<td></td>"}
   </tr>`;}).join("");
 
   const tableHtml=`<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto">
@@ -987,6 +1095,81 @@ window.delScore=async id=>{
   if(!confirm("¿Borrar este score?"))return;
   try{await deleteDoc(doc(db,"scores",id));showToast("Score eliminado.");}
   catch(e){showToast("Error: "+e.message,"err");}
+};
+
+window.updateEditHoleLabels=function(val){
+  const isV=val==="vuelta";
+  const startH=isV?10:1;
+  document.querySelectorAll("#edit-holes-grid .eh-lbl").forEach((el,i)=>{
+    el.textContent="H"+(startH+i);
+  });
+};
+window.editScore=id=>{
+  const s=scores.find(x=>x.id===id);
+  if(!s)return;
+  const esPartic=s.participacion;
+  const n=s.holes?s.holes.length:0;
+  const isV=s.vuelta===true;
+  const showVueltaSel=!esPartic&&CATS_VUELTA.includes(s.cat)&&n===9;
+  // Construir inputs de hoyo
+  let holesHtml="";
+  if(!esPartic&&n>0){
+    const startH=isV?10:1;
+    holesHtml=`<div style="margin-top:10px"><label style="font-size:13px;font-weight:500">Scores por hoyo</label>
+      <div id="edit-holes-grid" style="display:grid;grid-template-columns:repeat(${Math.min(n,9)},1fr);gap:6px;margin-top:6px">
+      ${s.holes.map((v,i)=>`<div style="text-align:center"><label class="eh-lbl" style="font-size:10px;display:block;color:var(--tl)">H${startH+i}</label>
+        <input type="number" id="eh${i}" value="${v}" min="1" max="10" style="width:100%;text-align:center;padding:6px 2px;font-size:15px;font-weight:500"></div>`).join("")}
+      </div></div>`;
+  }
+  document.getElementById("modal-box").className="modal-box";
+  document.getElementById("modal-box").innerHTML=`
+    <h2 style="font-family:'Playfair Display',serif;font-size:18px;margin:0 0 16px">Editar tarjeta</h2>
+    <div style="font-size:14px;font-weight:500;margin-bottom:14px;color:var(--tl)">${s.nombre} · ${CAT_LABEL[s.cat]||s.cat}</div>
+    <div style="display:grid;gap:10px">
+      <div class="fg"><label>Nombre del torneo</label>
+        <input type="text" id="e-torneo" value="${s.torneo||""}" placeholder="Nombre del torneo"></div>
+      <div class="fg"><label>Fecha</label>
+        <input type="date" id="e-fecha" value="${s.fecha||""}"></div>
+      ${!esPartic?`<div class="fg"><label>Handicap</label>
+        <input type="number" id="e-hcp" value="${s.hcp||0}" min="0" placeholder="0"></div>`:""}
+      ${showVueltaSel?`<div class="fg"><label>Vuelta</label>
+        <select id="e-vuelta" onchange="updateEditHoleLabels(this.value)">
+          <option value="ida" ${!isV?"selected":""}>Ida (H1–H9)</option>
+          <option value="vuelta" ${isV?"selected":""}>Vuelta (H10–H18)</option>
+        </select></div>`:""}
+      ${holesHtml}
+    </div>
+    <div class="modal-acts" style="margin-top:18px">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEditScore('${id}',${esPartic},${n})">Guardar cambios</button>
+    </div>`;
+  document.getElementById("modal-ov").style.display="flex";
+};
+
+window.guardarEditScore=async(id,esPartic,n)=>{
+  const torneo=document.getElementById("e-torneo").value.trim()||"Sin nombre";
+  const fecha=document.getElementById("e-fecha").value;
+  const btn=document.querySelector("#modal-box .btn-primary");
+  btn.disabled=true;btn.textContent="Guardando...";
+  try{
+    const updates={torneo,fecha};
+    const vueltaEl=document.getElementById("e-vuelta");
+    if(vueltaEl) updates.vuelta=(vueltaEl.value==="vuelta");
+    if(!esPartic&&n>0){
+      const hcp=parseInt(document.getElementById("e-hcp").value)||0;
+      const holes=[];
+      for(let i=0;i<n;i++){
+        const v=parseInt(document.getElementById("eh"+i).value);
+        if(isNaN(v)||v<1){showToast("Completá todos los hoyos","err");btn.disabled=false;btn.textContent="Guardar cambios";return;}
+        holes.push(v);
+      }
+      const gross=holes.reduce((a,b)=>a+b,0);
+      updates.hcp=hcp;updates.holes=holes;updates.gross=gross;updates.neto=gross-hcp;
+    }
+    await updateDoc(doc(db,"scores",id),updates);
+    showToast("Score actualizado!");
+    closeModal();
+  }catch(e){showToast("Error: "+e.message,"err");btn.disabled=false;btn.textContent="Guardar cambios";}
 };
 
 // ─── Estadísticas ─────────────────────────────────────
