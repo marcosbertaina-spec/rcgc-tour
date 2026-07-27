@@ -445,7 +445,7 @@ function catFromYear(y){
   return null;
 }
 
-let isAdmin=false,players=[],scores=[],activeLbCat="TODAS",activeLbTorneo="TODOS";
+let isAdmin=false,players=[],scores=[],activeLbCat="TODAS",activeLbTorneo=null;
 let isIniciales=false,isM18=false,catHoles=9,catVuelta=false,editingId=null,currentTab="leaderboard";
 let unsubPlayers=null,unsubScores=null;
 
@@ -597,12 +597,21 @@ function lbTable(cs, tipo, grossWinnersJids=null){
 function renderLeaderboard(){
   const el=document.getElementById("tab-leaderboard");
   const LB_CATS=[...SCORE_CATS,"INICIALES"];
-  // Torneos disponibles
-  const torneos=["TODOS",...new Set(scores.map(s=>s.torneo).filter(Boolean))].sort((a,b)=>a==="TODOS"?-1:b==="TODOS"?1:b.localeCompare(a));
+
+  // Agrupar torneos por nombre tomando la fecha más reciente de cada uno
+  const torneoMap={};
+  scores.forEach(s=>{if(s.torneo&&s.fecha&&(!torneoMap[s.torneo]||s.fecha>torneoMap[s.torneo]))torneoMap[s.torneo]=s.fecha;});
+  // Ordenar de más reciente a más antiguo
+  const torneosSorted=Object.entries(torneoMap).sort((a,b)=>b[1].localeCompare(a[1]));
+  // Por defecto, seleccionar el torneo más reciente
+  if(activeLbTorneo===null&&torneosSorted.length) activeLbTorneo=torneosSorted[0][0];
+  function fmtF(iso){if(!iso)return"";const[y,m,d]=iso.split("-");return`${d}/${m}/${y}`;}
+
   const torneoSel=`<div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <label style="font-size:13px;font-weight:500;color:var(--tm)">Torneo:</label>
     <select style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--cream-d);background:var(--white)" onchange="filterLbTorneo(this.value)">
-      ${torneos.map(t=>`<option value="${t}" ${t===activeLbTorneo?"selected":""}>${t==="TODOS"?"Todos los torneos":t}</option>`).join("")}
+      <option value="TODOS" ${activeLbTorneo==="TODOS"?"selected":""}>Todos los torneos</option>
+      ${torneosSorted.map(([nombre,fecha])=>`<option value="${nombre}" ${nombre===activeLbTorneo?"selected":""}>${fmtF(fecha)} – ${nombre}</option>`).join("")}
     </select></div>`;
   const filters=`<div class="cat-filters">${["TODAS",...LB_CATS].map(c=>
     `<button class="cfbtn${c===activeLbCat?" active":""}" onclick="filterLb('${c}')">${
@@ -610,7 +619,7 @@ function renderLeaderboard(){
   ).join("")}</div>`;
   const cats=activeLbCat==="TODAS"?LB_CATS:[activeLbCat];
   // Scores filtrados por torneo
-  const scoresFiltered=activeLbTorneo==="TODOS"?scores:scores.filter(s=>s.torneo===activeLbTorneo);
+  const scoresFiltered=(activeLbTorneo===null||activeLbTorneo==="TODOS")?scores:scores.filter(s=>s.torneo===activeLbTorneo);
   let html="";
 
   cats.forEach(cat=>{
@@ -1060,7 +1069,11 @@ function renderHistorial(){
   if(!all.length){el.innerHTML='<div class="empty-st"><span class="empty-icon">📋</span>El historial está vacío.</div>';return;}
 
   // Opciones únicas para los selects
-  const torneos=[...new Set(all.map(s=>s.torneo))].sort();
+  // Torneos: agrupar por nombre con su fecha más reciente, ordenar de más reciente a más antiguo
+  const torneoMap={};
+  all.forEach(s=>{if(s.torneo&&s.fecha&&(!torneoMap[s.torneo]||s.fecha>torneoMap[s.torneo]))torneoMap[s.torneo]=s.fecha;});
+  const torneosSorted=Object.entries(torneoMap).sort((a,b)=>b[1].localeCompare(a[1]));
+  function fmtFH(iso){if(!iso)return"";const[y,m,d]=iso.split("-");return`${d}/${m}/${y}`;}
   const jugadores=[...new Set(all.map(s=>s.nombre))].sort();
   const cats=[...new Set(all.map(s=>s.cat))];
 
@@ -1076,7 +1089,7 @@ function renderHistorial(){
 
   const filtersHtml=`<div class="card"><div class="hist-filters">
     <div class="fg"><label>Torneo</label><select onchange="setHistFilter('torneo',this.value)">
-      <option value="">Todos</option>${torneos.map(t=>`<option value="${t}" ${histFilters.torneo===t?"selected":""}>${t}</option>`).join("")}
+      <option value="">Todos</option>${torneosSorted.map(([nombre,fecha])=>`<option value="${nombre}" ${histFilters.torneo===nombre?"selected":""}>${fmtFH(fecha)} – ${nombre}</option>`).join("")}
     </select></div>
     <div class="fg"><label>Jugador</label><select onchange="setHistFilter('jugador',this.value)">
       <option value="">Todos</option>${jugadores.map(j=>`<option value="${j}" ${histFilters.jugador===j?"selected":""}>${j}</option>`).join("")}
