@@ -409,8 +409,11 @@ const LISTADO_MAYO_DUPLICADOS = [{"listado_apellido": "CACCIAVIGLIANI", "listado
 
 const CAT_ICONS  = {M18:"🏌️",ALBATROS:"🦆",AGUILA:"🦅",BIRDIE:"🐦",PAR:"⛳",PRINCIPIANTES:"🌱",INICIALES:"⭐"};
 const SCORE_CATS = ["M18","ALBATROS","AGUILA","BIRDIE","PAR","PRINCIPIANTES"];
-const MIXED_CATS = ["PRINCIPIANTES","PAR"]; // categorías con Gross y Neto mixtos
-const NETO_ONLY_MIXED = ["M18","ALBATROS","AGUILA","BIRDIE"]; // Gross por género, Neto mixto
+const MIXED_CATS = ["PRINCIPIANTES","PAR"]; // Gross y Neto mixtos
+const NETO_ONLY_MIXED = ["AGUILA","BIRDIE"]; // Gross por género, Neto mixto
+// A partir de este domingo, M18 y ALBATROS pasan a ser mixtos (gross+neto sin separar género)
+const MIXED_V2_DATE = "2026-08-16";
+const MIXED_V2_CATS = ["M18","ALBATROS"];
 const HOLE_PAR_IDA    = [4,4,4,4,5,3,4,3,4]; // hoyos 1-9 (default: M18, Albatros)
 const HOLE_PAR_VUELTA = [4,3,4,4,5,5,3,4,5]; // hoyos 10-18
 // Par por categoría (ida) — solo las que difieren del default
@@ -620,6 +623,9 @@ function renderLeaderboard(){
   const cats=activeLbCat==="TODAS"?LB_CATS:[activeLbCat];
   // Scores filtrados por torneo
   const scoresFiltered=(activeLbTorneo===null||activeLbTorneo==="TODOS")?scores:scores.filter(s=>s.torneo===activeLbTorneo);
+  // M18 y ALBATROS mixtos solo si el torneo seleccionado es de la nueva era
+  const torneoFecha=activeLbTorneo&&activeLbTorneo!=="TODOS"?torneoMap[activeLbTorneo]:null;
+  const isV2Era=torneoFecha!=null&&torneoFecha>=MIXED_V2_DATE;
   let html="";
 
   cats.forEach(cat=>{
@@ -656,8 +662,9 @@ function renderLeaderboard(){
 
     const catScores=scoresFiltered.filter(s=>s.cat===cat&&!s.participacion);
     if(!catScores.length)return;
-    const isMixed=MIXED_CATS.includes(cat);
-    const isNetoMixed=NETO_ONLY_MIXED.includes(cat);
+    // M18 y ALBATROS: mixtos solo si el torneo seleccionado es de la nueva era (>= MIXED_V2_DATE)
+    const isMixed=MIXED_CATS.includes(cat)||(MIXED_V2_CATS.includes(cat)&&isV2Era);
+    const isNetoMixed=!isMixed&&(NETO_ONLY_MIXED.includes(cat)||MIXED_V2_CATS.includes(cat));
 
     // Encabezado de categoría
     let block=`<div class="lb-wrap"><div class="lb-cat-hdr">
